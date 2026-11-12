@@ -43,7 +43,7 @@ public class Refund {
     private boolean isSimulated = false;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "gateway_response", columnDefinition = "jsonb")
+    @Column(name = "gateway_response")
     private String gatewayResponse;
 
     @Column(name = "created_at", nullable = false)

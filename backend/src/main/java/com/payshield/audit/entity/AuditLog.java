@@ -30,6 +30,7 @@ public class AuditLog {
     @Column(name = "entity_id")
     private UUID entityId;
 
+    @Column(name = "details", columnDefinition = "TEXT")
     private String details;
 
     @Column(name = "ip_address", length = 50)

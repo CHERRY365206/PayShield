@@ -12,21 +12,69 @@
 
 ---
 
-## 1. Project Overview
+## Executive Summary: Purpose, Target Audience & Market Differentiation
 
-**PayShield** is an authorization, pre-flight fraud risk assessment, and transaction monitoring platform designed to demonstrate backend and frontend engineering practices for a **Software Engineering Intern application at PayPal**.
-
-Rather than implementing a simple wallet or passive dashboard, PayShield demonstrates an end-to-end payment workflow:
-1. **Pre-flight Risk Assessment**: Evaluates transactions before creating an upstream gateway order.
-2. **Deterministic Risk Categorization**: Classifies transactions into `APPROVED`, `REVIEW_REQUIRED`, or `DECLINED` based on configurable risk heuristics (velocity, volume, failure rate, and geographic anomaly).
-3. **Razorpay Standard Checkout Integration**: Dynamically loads and launches Razorpay UPI checkout in TEST MODE with supported mock identifiers (`success@razorpay` and `failure@razorpay`).
-4. **Server-Side HMAC-SHA256 Signature Verification**: Eliminates client-side trust by strictly verifying signature authenticity on the backend before capturing payment.
-5. **Database-Backed Idempotency**: Guarantees zero duplicate order creations using database unique constraints and SHA-256 canonical payload hashing.
-6. **Auditability & Webhook Ingestion**: Ingests gateway events with replay protection and maintains immutable security audit logs.
+### 1. Who is PayShield for?
+* **E-Commerce & High-Volume Digital Platforms**: Merchants who need to protect their checkout flow from bot attacks, fraud rings, and chargeback liabilities.
+* **Fintech Platforms & Payment Aggregators**: Technology platforms (modeled after **PayPal Risk Management**, **Stripe Radar**, and **Adyen**) that evaluate transactions before routing them to banking networks.
+* **Compliance & Risk Operations Teams**: Fraud analysts and operations engineers who require real-time telemetry, automated velocity triggers, explainable decision matrices, and immutable audit trails.
+* **Software Engineering Hiring Teams & Assessors**: Built specifically to showcase robust, institutional fintech system design, safe distributed state handling, and defensive coding for a **Software Engineering Intern application at PayPal**.
 
 ---
 
-## 2. System Architecture
+### 2. What is PayShield's Purpose?
+In enterprise fintech, a web application should **never** directly relay customer checkout requests straight into banking rails or payment gateways without pre-flight risk evaluation. 
+
+PayShield acts as the **intelligent authorization gatekeeper and transaction monitoring platform**:
+1. **Pre-flight Risk Assessment**: Before an upstream order is ever created with a payment gateway, PayShield evaluates the transaction using an explainable, deterministic rule engine.
+2. **Three-Tier Decisioning**: Categorizes payments into `APPROVED` (order created, proceed to checkout), `REVIEW_REQUIRED` (held for fraud team review), or `DECLINED` (rejected immediately to save interchange fees and prevent fraud).
+3. **Idempotency Protection**: Ensures zero double-charging or duplicate order creation during client double-clicks or intermittent network retries using database-level unique constraints and SHA-256 payload hashing.
+4. **Cryptographic Gateway Verification**: Server-side validation of payment signatures using constant-time HMAC-SHA256 byte comparison to prevent frontend tampering.
+5. **Full Operational Oversight**: Complete admin portal with real-time risk distribution metrics, failure cascade monitoring, and append-only audit logging.
+
+---
+
+### 3. Why is PayShield Needed When Consumer UPI Apps (Google Pay, PhonePe, Paytm) Already Exist?
+
+A common question is: *"Why do we need PayShield if consumer apps like Google Pay, PhonePe, and Paytm already process UPI payments?"*
+
+The answer lies in **understanding the two different sides of the payment ecosystem**:
+
+```
+[Consumer / Payer Side]                [Platform / Merchant Risk Gatekeeper]               [Settlement & Banking Rails]
++-------------------------+            +------------------------------------+              +---------------------------+
+|   Google Pay / PhonePe  |  Request   |             PayShield              |  API Order   |     Razorpay / NPCI /     |
+| (Client TPAP UPI App)   | ---------> |  1. Pre-flight Fraud Evaluation    | -----------> |        Acquiring Bank     |
+|                         |            |  2. Idempotency Key Validation     |              |                           |
+| - Scan QR / Enter VPA   |            |  3. Velocity / Anomaly Analysis    |              | - UPI PIN Verification    |
+| - Client-side PIN input |            |  4. Server-Side Signature Verify   | <----------- | - Bank-to-Bank Settlement |
++-------------------------+            |  5. Audit Log & Dispute Defense    |  Signatures  +---------------------------+
+                                       +------------------------------------+
+```
+
+#### Consumer UPI Apps (GPay, PhonePe, Paytm)
+* **Role**: **TPAPs (Third-Party Application Providers)** for the payer.
+* **Scope**: They provide a consumer-friendly UI to bind bank accounts, scan QR codes, and prompt the user for their 4/6-digit UPI MPIN.
+* **What they DO NOT do for the merchant or platform**:
+  * They **do not protect the merchant** from fraud, automated bot checkouts, or card/UPI testing attacks. As long as a valid PIN is entered, the UPI app will attempt the debit.
+  * They **do not protect against duplicate network requests** at the application layer.
+  * They **do not provide merchant-side fraud scoring**, risk analytics, or granular manual review queues.
+  * They provide **zero visibility into why a transaction pattern is suspicious** (e.g., sudden location hops across cities within minutes).
+
+#### PayShield (The Platform / Risk Gateway)
+PayShield represents the internal risk and payment infrastructure that companies like **PayPal, Uber, Amazon, and Stripe** build to govern incoming payment traffic.
+
+| Scenario / Problem | Consumer UPI Apps (GPay / PhonePe) | PayShield Platform Gateway |
+| :--- | :--- | :--- |
+| **Rapid Automated Bot Attacks (Velocity)** | Forwards every request to the banking switch as long as initiated. | **Blocks at Gateway**: Evaluates rolling transaction frequency (>3 tx/min or >5 tx/5min) and throttles or `DECLINE`s malicious velocity bursts before orders reach the gateway. |
+| **Geographic Account Takeover** | Has no merchant context (e.g., user transacts from Mumbai, but 2 minutes later from London). | **Geographic Anomaly Detection**: Compares current transaction location against recent history and flags impossible velocity/location variance. |
+| **Network Timeout & Double-Click Debits** | If a network drops or a customer clicks "Pay" twice, two independent orders could be created. | **Atomic SHA-256 Idempotency Layer**: Database unique constraints enforce that duplicate payloads safely return the original order without redundant charges. |
+| **Chargeback & Dispute Liability** | Merchant is held financially liable if fraudulent orders settle. | **Pre-flight Gatekeeper**: High-risk transactions are stopped *before* hitting the gateway, eliminating gateway fees and chargeback exposure. |
+| **Operational Compliance & Auditing** | Merchants only receive a simple bank statement or pass/fail webhook. | **Immutable Audit Trail**: Append-only log of every state transition (`CREATED` &rarr; `RISK_EVALUATION` &rarr; `ORDER_CREATED` &rarr; `CAPTURED`), preserving raw cryptographic signatures. |
+
+---
+
+## System Architecture
 
 ```mermaid
 graph TD
@@ -36,10 +84,10 @@ graph TD
     Risk["Rule-Based Risk Assessment Engine"]
     Idempotency["Database-Backed Idempotency Service"]
     PaymentMgr["Payment Lifecycle Service"]
-    Gateway["Razorpay Gateway Client (TEST MODE)"]
+    Gateway["Razorpay Gateway Client (TEST MODE / Simulator)"]
     WebhookRecv["Webhook Ingestion (HMAC-SHA256)"]
     Audit["Async Audit Logging Service"]
-    DB[("PostgreSQL 16 DB (Flyway Managed)")]
+    DB[("PostgreSQL 16 / Embedded H2 DB")]
 
     Client -->|REST API Requests| API
     API --> Security
@@ -58,7 +106,7 @@ graph TD
 
 ---
 
-## 3. Payment Lifecycle
+## Payment Lifecycle State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -76,10 +124,10 @@ stateDiagram-v2
     REVIEW_REQUIRED --> PENDING_REVIEW : Queued for Manual Admin Review
     APPROVED --> ORDER_CREATED : Upstream Razorpay Order Created
 
-    ORDER_CREATED --> CHECKOUT : Razorpay Standard Modal Opened
+    ORDER_CREATED --> CHECKOUT : Razorpay Standard Modal / Simulator Opened
 
     CHECKOUT --> SUCCESS : success@razorpay
-    CHECKOUT --> FAILED : failure@razorpay / Network Drop
+    CHECKOUT --> FAILED : failure@razorpay / Bank Decline
     CHECKOUT --> CANCELLED : Customer Closes Modal
 
     SUCCESS --> VERIFIED : Backend HMAC-SHA256 Validated
@@ -94,7 +142,7 @@ stateDiagram-v2
 
 ---
 
-## 4. Risk Assessment Engine
+## Risk Assessment Engine
 
 PayShield features an explainable, deterministic rule-based fraud risk engine. Every evaluation produces an aggregate score (clamped between `0` and `100`), an explicit decision, and structured explanations:
 
@@ -106,38 +154,38 @@ PayShield features an explainable, deterministic rule-based fraud risk engine. E
 | **Rule 4: Geographic Anomaly** | Location deviation | Mismatch with last 5 customer transactions | +25 points |
 
 ### Decision Thresholds
-- **`0 – 29`**: **`APPROVED`** &rarr; Order is sent to Razorpay Gateway; checkout proceeds.
-- **`30 – 59`**: **`REVIEW_REQUIRED`** &rarr; Transaction saved as `PENDING_REVIEW`; gateway order is held for manual admin review.
-- **`60 – 100`**: **`DECLINED`** &rarr; Transaction rejected immediately; zero gateway order is created.
+* **`0 – 29`**: **`APPROVED`** &rarr; Order is sent to Razorpay Gateway; checkout proceeds.
+* **`30 – 59`**: **`REVIEW_REQUIRED`** &rarr; Transaction saved as `PENDING_REVIEW`; gateway order is held for manual admin review.
+* **`60 – 100`**: **`DECLINED`** &rarr; Transaction rejected immediately; zero gateway order is created.
 
 ---
 
-## 5. Technology Stack
+## Technology Stack
 
 ### Backend
-- **Java 21** (Temurin LTS)
-- **Spring Boot 3.4.0** (Spring Web, Spring Data JPA, Spring Security, Actuator, Validation)
-- **PostgreSQL 16** with **Flyway** migrations
-- **Razorpay Java SDK 1.4.6**
-- **JJWT 0.12.3** (HMAC-SHA256 stateless tokens)
-- **Springdoc OpenAPI 2.6.0** (Swagger UI)
+* **Java 21** (Temurin LTS)
+* **Spring Boot 3.4.0** (Spring Web, Spring Data JPA, Spring Security, Actuator, Validation)
+* **PostgreSQL 16** with **Flyway** migrations + Zero-Config H2 dev profile
+* **Razorpay Java SDK 1.4.6** + Zero-Config fallback simulator
+* **JJWT 0.12.3** (HMAC-SHA256 stateless tokens)
+* **Springdoc OpenAPI 2.6.0** (Swagger UI)
 
 ### Frontend
-- **React 18** with **TypeScript**
-- **Vite 6**
-- **Tailwind CSS 3.4**
-- **React Router 7**
-- **Recharts 2.15** (Data telemetry & analytics)
-- **Lucide React** (Fintech UI icons)
-- **Axios** (With Bearer token interceptors)
+* **React 18** with **TypeScript 5.7**
+* **Vite 6**
+* **Tailwind CSS 3.4**
+* **React Router 7**
+* **Recharts 2.15** (Data telemetry & fraud analytics)
+* **Lucide React** (Fintech UI icons)
+* **Axios** (With Bearer token & idempotency interceptors)
 
 ### Infrastructure & QA
-- **Docker & Docker Compose**
-- **JUnit 5**, **Mockito**, **MockMvc**
+* **Docker & Docker Compose**
+* **JUnit 5**, **Mockito**, **MockMvc** (22/22 tests passing)
 
 ---
 
-## 6. Seed Accounts & Credentials
+## Seed Accounts & Credentials
 
 For immediate development and assessment, PayShield initializes default accounts at startup:
 
@@ -148,14 +196,40 @@ For immediate development and assessment, PayShield initializes default accounts
 
 ---
 
-## 7. Quick Start & Execution
+## Quick Start & Execution
 
 ### Prerequisites
-- Java 21 JDK
-- Node.js (v20+) & npm
-- PostgreSQL 16 (or Docker)
+* Java 21 JDK
+* Node.js (v20+) & npm
+* Maven 3.9+
 
-### Option A: Running with Docker Compose (Recommended)
+---
+
+### Option A: Zero-Config Local Run (Recommended for Immediate Testing)
+
+PayShield includes an embedded, zero-configuration local database profile and gateway simulator that runs without needing PostgreSQL or external Razorpay accounts:
+
+#### 1. Start the Backend
+```cmd
+cd backend
+set JAVA_HOME=C:\Users\Dell\AppData\Local\Programs\Eclipse Adoptium\jdk-21.0.13.9-hotspot
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
+```
+* Backend runs on: `http://localhost:8080`
+* Swagger UI Docs: `http://localhost:8080/swagger-ui/index.html`
+* Health Endpoint: `http://localhost:8080/actuator/health`
+
+#### 2. Start the Frontend
+```cmd
+cd frontend
+npm install
+npm run dev
+```
+* Frontend runs on: `http://localhost:5173`
+
+---
+
+### Option B: Running with Docker Compose (PostgreSQL 16 Production Stack)
 
 ```bash
 # Clone the repository
@@ -164,7 +238,7 @@ cd payshield
 # Copy environment variables
 cp .env.example .env
 
-# Start PostgreSQL and Backend
+# Start PostgreSQL and Backend containers
 docker-compose up --build -d
 
 # Start Frontend
@@ -177,58 +251,39 @@ Visit the frontend at `http://localhost:5173`.
 
 ---
 
-### Option B: Running Locally
+## Testing Scenarios: End-to-End Walkthrough
 
-#### 1. Start PostgreSQL
-Ensure PostgreSQL is running locally on port `5432` with a database named `payshield` (`user: payshield`, `password: payshield123`).
+1. **Low Risk Flow (`APPROVED` &rarr; `CAPTURED`)**:
+   * Open `http://localhost:5173` &rarr; Sign in as `customer@payshield.com` / `Customer@123`.
+   * Click **Pay Now**, enter `₹500`, click **Evaluate Risk & Proceed**.
+   * Risk engine calculates score `0` (`APPROVED`).
+   * Click **Open Razorpay UPI Checkout**, select `success@razorpay`, click Pay.
+   * Backend cryptographically verifies signature, status transitions to `CAPTURED`, redirects to transaction receipt.
 
-#### 2. Run Backend
-```powershell
-cd backend
-# Set JAVA_HOME if not on default PATH
-$env:JAVA_HOME = "C:\Users\Dell\AppData\Local\Programs\Eclipse Adoptium\jdk-21.0.13.9-hotspot"
+2. **Velocity Spike Flow (`DECLINED`)**:
+   * Rapidly trigger multiple payment orders within 60 seconds.
+   * Risk engine detects velocity threshold breach (>3/min) &rarr; adds +30 points.
+   * Combined score exceeds threshold &rarr; sets status to `DECLINED` / `REJECTED`, blocking order creation.
 
-# Run tests
-& "E:\pay\maven\apache-maven-3.9.9\bin\mvn.cmd" test "-Dspring.profiles.active=test"
+3. **High-Risk Amount Flow (`DECLINED`)**:
+   * Enter `₹25,000` with an anomalous location.
+   * High amount rule adds +25 points, location anomaly adds +25 points &rarr; triggers `DECLINED`.
 
-# Start Spring Boot application
-& "E:\pay\maven\apache-maven-3.9.9\bin\mvn.cmd" spring-boot:run
-```
-Backend runs on `http://localhost:8080`.  
-Swagger UI is live at: `http://localhost:8080/swagger-ui/index.html`.
+4. **Failure Simulation**:
+   * In checkout, select `failure@razorpay` &rarr; transaction transitions to `FAILED` with failure audit logged.
 
-#### 3. Run Frontend
-```powershell
-cd frontend
-npm install
-npm run dev
-```
-Frontend runs on `http://localhost:5173`.
+5. **Refund Processing**:
+   * On any captured transaction detail page, click **Request Refund** &rarr; transitions to `REFUNDED`.
 
----
-
-## 8. Steps to Perform a Simulated UPI Payment
-
-1. Open `http://localhost:5173` in your browser.
-2. Click **"Fill Customer"** (`customer@payshield.com` / `Customer@123`) and click **Sign In**.
-3. In the Customer Dashboard, click **Pay Now**.
-4. Enter an amount:
-   - **Normal Test**: Enter `₹500` &rarr; Click **Evaluate Risk & Proceed**.
-   - Notice the Risk Engine outputs `APPROVED` with a score of `0` and reasons.
-5. Click **Open Razorpay UPI Checkout**.
-6. The official Razorpay modal appears in **TEST MODE**:
-   - Select **UPI / QR**.
-   - Under UPI ID, enter: `success@razorpay`.
-   - Click **Pay Now**.
-7. The payment is processed by Razorpay test gateway, redirected to backend verification (`/api/v1/payments/verify`), and signature is verified using HMAC-SHA256.
-8. The UI redirects to the **Transaction Details** screen displaying `CAPTURED` status and gateway order/payment IDs.
-9. To test a failure, initiate another transaction and enter `failure@razorpay` in the UPI prompt.
+6. **Admin Telemetry & Compliance**:
+   * Sign in as `admin@payshield.com` / `Admin@123`.
+   * Inspect transaction telemetry, flagged risk queue, and immutable audit logs.
 
 ---
 
-## 9. Automated Testing Verification
+## Automated Testing Suite
 
-All 22 unit and integration tests execute successfully without internet dependency:
+All 22 unit and integration tests execute successfully without network dependency:
 
 ```text
 [INFO] -------------------------------------------------------
@@ -256,18 +311,17 @@ All 22 unit and integration tests execute successfully without internet dependen
 
 ---
 
-## 10. Security Compliance Summary
+## Security Compliance & Defensive Design
 
-- [x] **No Secret Leakage**: `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` are never bundled into client JS.
-- [x] **Zero Floating-Point Financials**: All amounts are represented as `BIGINT` in paise / minor units.
-- [x] **Database Constraints**: `idempotency_key` and `razorpay_event_id` have unique database indexes.
-- [x] **Constant-Time Verification**: HMAC-SHA256 signature verification utilizes constant-time byte comparisons to prevent timing side-channel attacks.
-- [x] **Ownership Enforcement**: Customers can only inspect their own transactions; customer-to-customer data traversal is strictly blocked.
+* **Zero Secret Leakage**: API gateway secrets and webhook signing keys are never bundled in client code.
+* **Strict Integer Minor-Unit Math**: All currency calculations use `BIGINT` in paise to eliminate floating-point rounding errors.
+* **Idempotency Enforcement**: Canonical SHA-256 request body hashing with database unique constraints prevents double debits.
+* **Constant-Time Cryptography**: HMAC-SHA256 signature verification uses constant-time comparison to prevent timing side-channel attacks.
+* **Role-Based Access Control**: Strict segregation between `CUSTOMER` and `ADMIN` roles using stateless JWT tokens.
 
 ---
 
-## 11. Author
+## Author
 
 **PayShield Engineering Team**  
-Designed and built for the **Software Engineering Intern Application at PayPal**.
-
+Designed and built to demonstrate enterprise fintech system design, risk management, and authorization architecture for the **Software Engineering Intern Application at PayPal**.

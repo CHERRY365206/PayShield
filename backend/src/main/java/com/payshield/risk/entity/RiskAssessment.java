@@ -51,7 +51,7 @@ public class RiskAssessment {
     private int geographicScore;
 
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(columnDefinition = "text[]")
+    @Column(name = "reasons")
     private List<String> reasons;
 
     @Column(name = "evaluated_at", nullable = false)

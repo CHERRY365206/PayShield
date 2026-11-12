@@ -56,7 +56,7 @@ public class Transaction {
     @Column(name = "risk_decision", length = 30)
     private String riskDecision;
 
-    @Column(name = "risk_explanation")
+    @Column(name = "risk_explanation", columnDefinition = "TEXT")
     private String riskExplanation;
 
     @Column(name = "idempotency_key")
@@ -66,7 +66,7 @@ public class Transaction {
     private String simulatedLocation;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "gateway_response", columnDefinition = "jsonb")
+    @Column(name = "gateway_response")
     private String gatewayResponse;
 
     @Column(name = "created_at", nullable = false)

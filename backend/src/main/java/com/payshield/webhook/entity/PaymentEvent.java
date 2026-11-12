@@ -30,7 +30,7 @@ public class PaymentEvent {
     private String eventType;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
+    @Column(name = "payload")
     private String payload;
 
     @Builder.Default
