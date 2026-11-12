@@ -1,0 +1,49 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:payshield_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  flyway:
+    enabled: false
+
+server:
+  port: 0
+
+razorpay:
+  key-id: rzp_test_testkey12345
+  key-secret: test_secret_key_67890
+  webhook-secret: test_webhook_secret_12345
+
+app:
+  jwt:
+    secret: payshield_test_jwt_secret_key_minimum_256_bits_long_for_hs256_algorithm_testing_123
+    expiration-ms: 3600000
+  cors:
+    allowed-origins: http://localhost:5173
+  risk:
+    thresholds:
+      approved-max: 29
+      review-max: 59
+    amount:
+      elevated-threshold: 500000
+      high-threshold: 2000000
+    velocity:
+      max-transactions-per-minute: 3
+      max-transactions-per-five-minutes: 5
+    weights:
+      amount-anomaly: 25
+      velocity: 30
+      repeated-failures: 20
+      geographic-anomaly: 25
+
+logging:
+  level:
+    com.payshield: DEBUG

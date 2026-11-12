@@ -1,0 +1,5 @@
+-- V8__seed_admin_user.sql
+-- Seed users are managed dynamically at application startup by DataInitializer.java
+-- Default credentials:
+-- Admin: admin@payshield.com / Admin@123 (ROLE_ADMIN)
+-- Customer: customer@payshield.com / Customer@123 (ROLE_CUSTOMER)
