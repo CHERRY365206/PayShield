@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Shield, AlertTriangle, CheckCircle, XCircle, Info, RefreshCw, ShieldCheck } from 'lucide-react';
+import { CreditCard, Shield, AlertTriangle, CheckCircle, XCircle, Info, RefreshCw, ShieldCheck, QrCode } from 'lucide-react';
 import { paymentService } from '../services/paymentService';
 import { CreateOrderResponse } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +37,10 @@ export default function PaymentPage() {
   const [orderResult, setOrderResult] = useState<CreateOrderResponse | null>(null);
   const [step, setStep] = useState<'form' | 'risk_result' | 'checkout' | 'done'>('form');
 
+  // Simulated Modal State
+  const [showSimModal, setShowSimModal] = useState(false);
+  const [simUpiId, setSimUpiId] = useState('success@razorpay');
+
   // Idempotency key preserved across retry/double click
   const idempotencyKey = useRef(uuidv4());
 
@@ -72,11 +76,18 @@ export default function PaymentPage() {
   };
 
   const handleOpenRazorpay = () => {
-    if (!orderResult?.razorpayOrderId || !orderResult?.razorpayKeyId) {
+    if (!orderResult?.razorpayOrderId) {
       setError('Missing Razorpay checkout configuration');
       return;
     }
 
+    // If using placeholder credentials, open the in-app interactive Razorpay UPI simulator
+    if (!orderResult.razorpayKeyId || orderResult.razorpayKeyId.includes('placeholder')) {
+      setShowSimModal(true);
+      return;
+    }
+
+    // Otherwise load official Razorpay Standard Checkout SDK
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
@@ -137,14 +148,48 @@ export default function PaymentPage() {
         setStep('checkout');
       } catch (err: any) {
         setError(`Failed to open Razorpay modal: ${err.message}`);
+        setShowSimModal(true);
       }
     };
 
     script.onerror = () => {
-      setError('Could not load Razorpay checkout script from CDN');
+      // If CDN is unavailable or blocked, open in-app simulator
+      setShowSimModal(true);
     };
 
     document.body.appendChild(script);
+  };
+
+  const handleSimulatedPayment = async () => {
+    if (!orderResult) return;
+    setLoading(true);
+    setError('');
+
+    if (simUpiId === 'failure@razorpay') {
+      setError('Payment simulation: Bank / UPI declined transaction (failure@razorpay)');
+      setShowSimModal(false);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const simulatedPaymentId = 'pay_sim_' + Math.random().toString(36).substring(2, 12);
+      await paymentService.verifyPayment(
+        orderResult.razorpayOrderId!,
+        simulatedPaymentId,
+        'simulated_signature'
+      );
+      setShowSimModal(false);
+      setStep('done');
+      setTimeout(() => {
+        navigate(`/transactions/${orderResult.transactionId}`);
+      }, 1500);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Payment verification failed');
+      setShowSimModal(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReset = () => {
@@ -152,6 +197,7 @@ export default function PaymentPage() {
     setOrderResult(null);
     setStep('form');
     setError('');
+    setShowSimModal(false);
   };
 
   return (
@@ -362,7 +408,7 @@ export default function PaymentPage() {
                 <div className="bg-teal-50/80 border border-teal-200 p-4 rounded-xl text-xs text-teal-950 space-y-1">
                   <p className="font-bold">Ready for Razorpay Test Mode Checkout</p>
                   <p className="text-[11px] text-teal-900 leading-relaxed">
-                    Select <strong>UPI</strong> in Razorpay checkout and enter test IDs:
+                    Select <strong>UPI</strong> in checkout and enter supported test IDs:
                   </p>
                   <ul className="list-disc list-inside mt-1 font-mono text-[11px]">
                     <li><strong className="text-green-700">success@razorpay</strong> for payment verification test</li>
@@ -428,7 +474,92 @@ export default function PaymentPage() {
           </div>
         )}
       </div>
+
+      {/* Simulated UPI Checkout Modal (Active in local test mode with placeholder keys) */}
+      {showSimModal && orderResult && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-100 space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-50 text-[#1a2f6a] rounded-lg">
+                  <CreditCard className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm">Razorpay UPI Checkout (TEST MODE)</h3>
+                  <p className="text-[10px] text-gray-400">Order: {orderResult.razorpayOrderId}</p>
+                </div>
+              </div>
+              <span className="text-base font-extrabold text-gray-900">
+                ₹{(orderResult.amount / 100).toFixed(2)}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+                Enter Test Virtual Payment Address (VPA / UPI ID)
+              </label>
+              <input
+                type="text"
+                value={simUpiId}
+                onChange={(e) => setSimUpiId(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3.5 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a2f6a]"
+                placeholder="vpa@razorpay"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSimUpiId('success@razorpay')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border text-center transition-colors ${
+                    simUpiId === 'success@razorpay'
+                      ? 'bg-green-100 border-green-400 text-green-900'
+                      : 'bg-green-50/50 border-green-200 text-green-800 hover:bg-green-100/50'
+                  }`}
+                >
+                  ✓ success@razorpay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSimUpiId('failure@razorpay')}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border text-center transition-colors ${
+                    simUpiId === 'failure@razorpay'
+                      ? 'bg-red-100 border-red-400 text-red-900'
+                      : 'bg-red-50/50 border-red-200 text-red-800 hover:bg-red-100/50'
+                  }`}
+                >
+                  ✗ failure@razorpay
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-gray-600 flex items-start gap-2">
+              <QrCode className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+              <span>
+                Simulates Razorpay test checkout authorization. The payment response is sent to the backend for server-side HMAC verification before capturing.
+              </span>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSimModal(false)}
+                className="flex-1 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2.5 rounded-xl text-xs font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSimulatedPayment}
+                disabled={loading}
+                className="flex-1 bg-teal-500 hover:bg-teal-600 text-slate-900 font-bold py-2.5 rounded-xl text-xs transition-colors shadow-sm disabled:opacity-60 flex items-center justify-center gap-1.5"
+              >
+                {loading ? <LoadingSpinner size="sm" /> : <CheckCircle className="h-4 w-4" />}
+                <span>Pay ₹{(orderResult.amount / 100).toFixed(2)}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-

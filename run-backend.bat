@@ -7,3 +7,4 @@ echo   Profiles: dev (Zero-config embedded DB)
 echo ========================================================
 cd /d %~dp0backend
 call E:\pay\maven\apache-maven-3.9.9\bin\mvn.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
+

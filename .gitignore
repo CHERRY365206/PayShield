@@ -5,6 +5,7 @@
 
 # Java / Maven build output
 backend/target/
+backend/data/
 *.class
 *.jar
 *.war
