@@ -116,3 +116,4 @@ erDiagram
 6. `V6__create_refunds_table.sql`: Lifecycle tracking for full and partial refunds with simulation support.
 7. `V7__create_audit_logs_table.sql`: Security, authorization, and audit log table.
 8. `V8__seed_admin_user.sql`: Production baseline reference (dynamic seeding handled by `DataInitializer`).
+

@@ -12,3 +12,4 @@ CREATE TABLE refunds (
 );
 
 CREATE INDEX idx_refunds_transaction_id ON refunds(transaction_id);
+

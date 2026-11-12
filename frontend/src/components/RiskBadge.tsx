@@ -34,3 +34,4 @@ export default function RiskBadge({ decision, score, className = '' }: Props) {
     </span>
   );
 }
+

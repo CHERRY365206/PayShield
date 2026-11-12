@@ -28,3 +28,4 @@ export const adminService = {
     return res.data.data;
   },
 };
+

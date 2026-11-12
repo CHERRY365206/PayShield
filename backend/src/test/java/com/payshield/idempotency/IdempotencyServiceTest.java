@@ -69,3 +69,4 @@ class IdempotencyServiceTest {
         verify(idempotencyRepository, times(1)).save(any(IdempotencyRecord.class));
     }
 }
+

@@ -19,3 +19,4 @@ export default function ProtectedRoute({ requireAdmin = false }: Props) {
 
   return <Outlet />;
 }
+

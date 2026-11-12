@@ -24,3 +24,4 @@ $env:JAVA_HOME = "C:\Users\Dell\AppData\Local\Programs\Eclipse Adoptium\jdk-21.0
 | `IdempotencyServiceTest` | Duplicate request prevention | Verifies SHA-256 canonical hashing, concurrent idempotency record creation, identical request replay, and 409 Conflict on payload mismatch. |
 
 All tests utilize H2 in-memory storage and Mockito mocks for external Razorpay network operations.
+

@@ -52,3 +52,4 @@ graph TD
 4. **Stateless JWT Authentication**:
    - Access tokens are signed using HMAC-SHA256 with a 256-bit secret key.
    - Passwords hashed using standard BCrypt (strength factor 12).
+

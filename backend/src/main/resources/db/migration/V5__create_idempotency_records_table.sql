@@ -11,3 +11,4 @@ CREATE TABLE idempotency_records (
 
 CREATE UNIQUE INDEX idx_idempotency_key ON idempotency_records(idempotency_key);
 CREATE INDEX idx_idempotency_expires_at ON idempotency_records(expires_at);
+

@@ -49,3 +49,4 @@ public class AdminController {
         return ResponseEntity.ok(ApiResponse.success(adminService.getAuditLogs(pageable)));
     }
 }
+

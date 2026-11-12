@@ -14,3 +14,4 @@ export default function StatusBadge({ status, className = '' }: Props) {
     </span>
   );
 }
+

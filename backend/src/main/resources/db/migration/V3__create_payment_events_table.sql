@@ -10,3 +10,4 @@ CREATE TABLE payment_events (
 
 CREATE INDEX idx_payment_events_transaction_id ON payment_events(transaction_id);
 CREATE INDEX idx_payment_events_razorpay_event_id ON payment_events(razorpay_event_id);
+

@@ -45,3 +45,4 @@ export function getRiskBadge(decision: string): string {
   };
   return map[decision] || 'bg-gray-100 text-gray-800 border border-gray-200';
 }
+

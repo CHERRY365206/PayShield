@@ -20,3 +20,4 @@ export default function LoadingSpinner({ size = 'md', className = '', text }: Pr
     </div>
   );
 }
+

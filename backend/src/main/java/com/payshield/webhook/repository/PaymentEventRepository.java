@@ -12,3 +12,4 @@ public interface PaymentEventRepository extends JpaRepository<PaymentEvent, UUID
     Optional<PaymentEvent> findByRazorpayEventId(String eventId);
     boolean existsByRazorpayEventId(String eventId);
 }
+

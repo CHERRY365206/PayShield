@@ -47,3 +47,4 @@ app:
 logging:
   level:
     com.payshield: DEBUG
+

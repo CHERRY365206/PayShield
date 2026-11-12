@@ -14,3 +14,4 @@ CREATE TABLE risk_assessments (
 
 CREATE INDEX idx_risk_assessments_transaction_id ON risk_assessments(transaction_id);
 CREATE INDEX idx_risk_assessments_user_id ON risk_assessments(user_id);
+

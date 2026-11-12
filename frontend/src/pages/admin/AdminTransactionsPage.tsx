@@ -171,3 +171,4 @@ export default function AdminTransactionsPage({ flaggedOnly = false }: Props) {
     </div>
   );
 }
+
